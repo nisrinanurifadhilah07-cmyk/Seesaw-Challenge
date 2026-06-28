@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jungkat-Jungkit Seru!</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',sans-serif; background:#87CEEB; overflow:hidden; user-select:none; }
+  canvas { display:block; }
+  #side-panel {
+    position:fixed; right:12px; top:50%; transform:translateY(-50%);
+    background:rgba(255,255,255,0.93); border-radius:18px; padding:12px 10px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.22); z-index:10; width:110px;
+    display:flex; flex-direction:column; gap:8px; align-items:center;
+  }
+  #side-panel h3 { font-size:12px; color:#555; font-weight:bold; text-align:center; margin-bottom:2px; }
+  .person-card {
+    width:88px; background:#f0f8ff; border-radius:12px; padding:6px 4px;
+    text-align:center; cursor:grab; border:2px solid #ddd;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .person-card:hover { border-color:#3498db; box-shadow:0 2px 8px rgba(52,152,219,.3); }
+  .person-card:active { cursor:grabbing; }
+  .person-card canvas { display:block; margin:0 auto; }
+  .person-card .pname { font-size:10px; font-weight:bold; color:#444; margin-top:2px; }
+  .person-card .pmass { font-size:11px; color:#e74c3c; font-weight:bold; }
+  #hint {
+    position:fixed; top:10px; left:50%; transform:translateX(-50%);
+    background:rgba(255,255,220,0.95); border-radius:12px; padding:7px 15px;
+    font-size:12px; color:#555; text-align:center; z-index:10;
+    box-shadow:0 2px 8px rgba(0,0,0,0.15); max-width:460px;
+  }
+  #info-panel {
+    position:fixed; bottom:10px; left:50%; transform:translateX(-50%);
+    background:rgba(255,255,255,0.93); border-radius:16px; padding:9px 18px;
+    font-size:13px; color:#333; box-shadow:0 3px 12px rgba(0,0,0,0.2);
+    display:flex; gap:18px; align-items:center; z-index:10;
+  }
+  .info-item { display:flex; flex-direction:column; align-items:center; }
+  .info-label { font-size:10px; color:#888; text-transform:uppercase; font-weight:bold; }
+  .info-value { font-size:15px; font-weight:bold; color:#e74c3c; }
+  #reset-btn {
+    position:fixed; bottom:14px; right:130px;
+    background:#3498db; color:white; border:none; border-radius:20px;
+    padding:8px 18px; font-size:13px; font-weight:bold; cursor:pointer;
+    box-shadow:0 3px 8px rgba(0,0,0,0.25); z-index:10; font-family:inherit;
+  }
+  #reset-btn:hover { background:#2980b9; }
+  #music-btn {
+    position:fixed; top:10px; right:14px; z-index:20;
+    background:rgba(255,255,255,0.85); border:none; border-radius:50%;
+    width:36px; height:36px; font-size:17px; cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+  }
+  #start-screen {
+    position:fixed; inset:0; background:rgba(0,0,0,0.55);
+    display:flex; align-items:center; justify-content:center; z-index:100;
+  }
+  .start-box {
+    background:white; border-radius:24px; padding:34px 42px; text-align:center;
+    box-shadow:0 8px 40px rgba(0,0,0,0.4); max-width:370px;
+  }
+  .start-box h1 { font-size:26px; color:#e74c3c; margin-bottom:8px; }
+  .start-box p  { font-size:13px; color:#555; margin-bottom:20px; line-height:1.6; }
+  .start-btn { background:#e74c3c; color:white; border:none; border-radius:20px;
+    padding:11px 34px; font-size:17px; font-weight:bold; cursor:pointer; font-family:inherit; }
+  .start-btn:hover { background:#c0392b; }
+  #trash {
+    position:fixed; bottom:14px; right:14px; width:52px; height:52px;
+    background:#e74c3c; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:22px; z-index:10;
+    box-shadow:0 3px 10px rgba(0,0,0,0.25); transition:background .2s;
+  }
+  #trash.hover { background:#c0392b; transform:scale(1.1); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hint">Drag orang ke papan &nbsp;|&nbsp; Drag orang di papan untuk geser &nbsp;|&nbsp; Drag segitiga untuk geser titik tumpu &nbsp;|&nbsp; Drag ke tong sampah untuk hapus</div>
+
+<div id="side-panel">
+  <h3>Pilih Orang</h3>
+</div>
+
+<div id="info-panel">
+  <div class="info-item"><span class="info-label">Torsi Kiri</span><span class="info-value" id="t-left">0 Nm</span></div>
+  <div class="info-item"><span class="info-label">Torsi Kanan</span><span class="info-value" id="t-right">0 Nm</span></div>
+  <div class="info-item"><span class="info-label">Status</span><span class="info-value" id="status">Seimbang</span></div>
+  <div class="info-item"><span class="info-label">Titik Tumpu</span><span class="info-value" id="pivot-pos">Tengah</span></div>
+</div>
+
+<button id="reset-btn" onclick="resetAll()">&#x1F504; Reset</button>
+<button id="music-btn" onclick="toggleMusic()">&#x1F50A;</button>
+<div id="trash">&#x1F5D1;</div>
+
+<div id="start-screen">
+  <div class="start-box">
+    <div style="font-size:52px;margin-bottom:6px">&#127904;</div>
+    <h1>Jungkat-Jungkit!</h1>
+    <p>Drag orang dari panel kanan ke atas papan. Geser posisinya dan amati keseimbangan. Titik tumpu juga bisa digeser!</p>
+    <button class="start-btn" onclick="startGame()">&#9654; Mulai!</button>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize();window.addEventListener('resize',()=>{resize();initPlants();});
+
+// MUSIC
+const ACtx=window.AudioContext||window.webkitAudioContext;
+let audioCtx,musicPlaying=true;
+const MEL=[261.63,329.63,392,349.23,440,392,329.63,261.63,293.66,349.23,392,440,523.25,440,392,349.23];
+function playNote(f,time,dur){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.connect(g);g.connect(audioCtx.destination);
+  o.type='sine';o.frequency.value=f;
+  g.gain.setValueAtTime(0.08,time);
+  g.gain.exponentialRampToValueAtTime(0.001,time+dur);
+  o.start(time);o.stop(time+dur);
+}
+function playMelody(){
+  if(!audioCtx||!musicPlaying)return;
+  const now=audioCtx.currentTime;
+  MEL.forEach((f,i)=>playNote(f,now+i*0.32,0.28));
+  setTimeout(playMelody,MEL.length*320+300);
+}
+function createMusic(){if(!ACtx)return;audioCtx=new ACtx();playMelody();}
+function toggleMusic(){
+  if(!audioCtx){createMusic();return;}
+  musicPlaying=!musicPlaying;
+  document.getElementById('music-btn').textContent=musicPlaying?'\u{1F50A}':'\u{1F507}';
+  if(musicPlaying)playMelody();
+}
+
+// CLOUDS
+const clouds=Array.from({length:6},(_,i)=>({x:i*220+Math.random()*80,y:35+Math.random()*55,s:0.2+Math.random()*0.2,w:70+Math.random()*55}));
+function drawCloud(x,y,w){
+  ctx.fillStyle='rgba(255,255,255,0.88)';
+  [[0,0,w*.32],[w*.28,-w*.13,w*.24],[w*.55,0,w*.29],[w*.22,w*.1,w*.2]].forEach(([dx,dy,r])=>{
+    ctx.beginPath();ctx.arc(x+dx,y+dy,r,0,Math.PI*2);ctx.fill();
+  });
+}
+
+// PLANTS
+let plants=[];
+function initPlants(){
+  plants=[];
+  const n=Math.floor(W/68);
+  const cols=['#ff6b9d','#ffdc5e','#b98eff','#ff9f43','#00cec9'];
+  for(let i=0;i<n;i++){
+    plants.push({x:18+i*(W/n)*(0.85+Math.random()*0.28),h:15+Math.random()*18,
+      type:Math.random()>.5?'flower':'grass',col:cols[Math.floor(Math.random()*cols.length)],
+      sw:Math.random()*Math.PI*2,ss:.4+Math.random()*.5,grown:0});
+  }
+}
+function drawPlant(p){
+  const gy=H-80;p.sw+=.012*p.ss;
+  const s=Math.sin(p.sw)*3,g=Math.min(p.grown,1),ph=p.h*g;
+  if(ph<2)return;
+  ctx.strokeStyle='#2d8a1e';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(p.x,gy);
+  ctx.quadraticCurveTo(p.x+s,gy-ph*.5,p.x+s*.7,gy-ph);ctx.stroke();
+  if(p.type==='flower'&&g>.6){
+    const fx=p.x+s*.7,fy=gy-ph;
+    for(let i=0;i<5;i++){const a=(i/5)*Math.PI*2;ctx.fillStyle=p.col;ctx.beginPath();ctx.ellipse(fx+Math.cos(a)*5,fy+Math.sin(a)*5,4,3,a,0,Math.PI*2);ctx.fill();}
+    ctx.fillStyle='#ffdc5e';ctx.beginPath();ctx.arc(fx,fy,3,0,Math.PI*2);ctx.fill();
+  }else if(p.type==='grass'){
+    const gx=p.x+s*.7,gy2=gy-ph;
+    ctx.fillStyle='#3cb518';ctx.beginPath();
+    ctx.moveTo(gx-5,gy2+4);ctx.quadraticCurveTo(gx-2,gy2-7,gx,gy2);
+    ctx.quadraticCurveTo(gx+2,gy2-7,gx+5,gy2+4);ctx.fill();
+  }
+}
+
+// PERSON TYPES
+// scale = visual scale, mass = kg, bodyH = approx height in canvas units
+const PERSON_TYPES = [
+  { id:'anak',   label:'Anak',   mass:20,  scale:0.52, skin:'#f1c27d', hair:'#5c3317', hs:'normal',   body:'#3498db', pants:'#e74c3c',  shoeCol:'#333' },
+  { id:'remaja', label:'Remaja', mass:40,  scale:0.65, skin:'#f1c27d', hair:'#1a1a1a', hs:'pigtails', body:'#9b59b6', pants:'#f39c12',  shoeCol:'#333' },
+  { id:'ibu',    label:'Ibu',    mass:55,  scale:0.78, skin:'#c68642', hair:'#3d2b1f', hs:'bun',      body:'#e74c3c', pants:'#2c3e50',  shoeCol:'#333' },
+  { id:'ayah',   label:'Ayah',   mass:80,  scale:0.90, skin:'#c68642', hair:'#1a1a1a', hs:'spiky',    body:'#2c3e50', pants:'#7f8c8d',  shoeCol:'#1a1a1a' },
+];
+
+// Draw a person on a given canvas 2d ctx. foot at (0,0), upward negative.
+// sc = final visual scale
+function drawPersonShape(pctx, type, sc, label, showLabel){
+  const c = type;
+  pctx.save();
+  pctx.scale(sc, sc);
+  // sepatu
+  pctx.fillStyle=c.shoeCol||'#333';
+  pctx.beginPath();pctx.ellipse(-7,0,8,4.5,0,0,Math.PI*2);pctx.fill();
+  pctx.beginPath();pctx.ellipse(7,0,8,4.5,0,0,Math.PI*2);pctx.fill();
+  // celana/rok
+  pctx.fillStyle=c.pants;
+  if(c.id==='ibu'){
+    // rok
+    pctx.beginPath();pctx.moveTo(-12,-6);pctx.lineTo(-14,0);pctx.lineTo(14,0);pctx.lineTo(12,-6);pctx.closePath();pctx.fill();
+    pctx.beginPath();pctx.roundRect(-10,-26,20,22,4);pctx.fill();
+  } else {
+    pctx.beginPath();pctx.roundRect(-9,-24,8,24,3);pctx.fill();
+    pctx.beginPath();pctx.roundRect(1,-24,8,24,3);pctx.fill();
+  }
+  // badan
+  pctx.fillStyle=c.body;
+  pctx.beginPath();pctx.roundRect(-11,-46,22,24,6);pctx.fill();
+  // kerah / detail
+  pctx.fillStyle='rgba(255,255,255,0.3)';
+  pctx.beginPath();pctx.moveTo(-4,-46);pctx.lineTo(0,-40);pctx.lineTo(4,-46);pctx.fill();
+  // lengan
+  pctx.strokeStyle=c.body;pctx.lineWidth=7;pctx.lineCap='round';
+  if(c.id==='ibu'){
+    pctx.beginPath();pctx.moveTo(-11,-40);pctx.lineTo(-20,-30);pctx.stroke();
+    pctx.beginPath();pctx.moveTo(11,-40);pctx.lineTo(20,-30);pctx.stroke();
+  } else {
+    pctx.beginPath();pctx.moveTo(-11,-38);pctx.lineTo(-20,-28);pctx.stroke();
+    pctx.beginPath();pctx.moveTo(11,-38);pctx.lineTo(20,-28);pctx.stroke();
+  }
+  // tangan
+  pctx.fillStyle=c.skin;
+  const hx=c.id==='ibu'?20:20, hy=c.id==='ibu'?-30:-28;
+  pctx.beginPath();pctx.arc(-hx,hy,5,0,Math.PI*2);pctx.fill();
+  pctx.beginPath();pctx.arc(hx,hy,5,0,Math.PI*2);pctx.fill();
+  // leher
+  pctx.fillStyle=c.skin;pctx.fillRect(-5,-50,10,6);
+  // kepala
+  const headR = c.id==='anak'?15:c.id==='remaja'?14:c.id==='ibu'?14:15;
+  const headY = c.id==='anak'?-65:c.id==='remaja'?-66:c.id==='ibu'?-66:-68;
+  pctx.beginPath();pctx.ellipse(0,headY,headR,headR+2,0,0,Math.PI*2);pctx.fill();
+  // kacamata (ayah)
+  if(c.id==='ayah'){
+    pctx.strokeStyle='#333';pctx.lineWidth=1.5;
+    pctx.beginPath();pctx.roundRect(-14,headY-5,12,9,3);pctx.stroke();
+    pctx.beginPath();pctx.roundRect(2,headY-5,12,9,3);pctx.stroke();
+    pctx.beginPath();pctx.moveTo(-2,headY-1);pctx.lineTo(2,headY-1);pctx.stroke();
+  }
+  // rambut
+  pctx.fillStyle=c.hair;
+  pctx.beginPath();pctx.ellipse(0,headY-headR+3,headR,headR*.55,0,0,Math.PI*2);pctx.fill();
+  if(c.hs==='spiky'){
+    for(let i=-2;i<=2;i++){pctx.beginPath();pctx.moveTo(i*5,headY-headR+2);pctx.lineTo(i*5-4,headY-headR-9);pctx.lineTo(i*5+4,headY-headR-9);pctx.fill();}
+  } else if(c.hs==='pigtails'){
+    pctx.beginPath();pctx.ellipse(-headR-2,headY-4,5,8,-.3,0,Math.PI*2);pctx.fill();
+    pctx.beginPath();pctx.ellipse(headR+2,headY-4,5,8,.3,0,Math.PI*2);pctx.fill();
+  } else if(c.hs==='bun'){
+    pctx.beginPath();pctx.arc(0,headY-headR-2,8,0,Math.PI*2);pctx.fill();
+  }
+  // mata
+  pctx.fillStyle='white';
+  pctx.beginPath();pctx.ellipse(-6,headY,4,5,0,0,Math.PI*2);pctx.fill();
+  pctx.beginPath();pctx.ellipse(6,headY,4,5,0,0,Math.PI*2);pctx.fill();
+  pctx.fillStyle='#222';
+  pctx.beginPath();pctx.arc(-6,headY-1,2.8,0,Math.PI*2);pctx.fill();
+  pctx.beginPath();pctx.arc(6,headY-1,2.8,0,Math.PI*2);pctx.fill();
+  pctx.fillStyle='white';
+  pctx.beginPath();pctx.arc(-5,headY-2,1,0,Math.PI*2);pctx.fill();
+  pctx.beginPath();pctx.arc(7,headY-2,1,0,Math.PI*2);pctx.fill();
+  // senyum
+  pctx.strokeStyle='#c0392b';pctx.lineWidth=1.8;
+  pctx.beginPath();pctx.arc(0,headY+4,5,.15,Math.PI-.15);pctx.stroke();
+  // label massa
+  if(showLabel){
+    pctx.fillStyle='rgba(0,0,0,.7)';pctx.font='bold 13px Segoe UI';pctx.textAlign='center';
+    pctx.fillText(c.mass+' kg',0,20);
+  }
+  pctx.restore();
+}
+
+// Build side panel
+function buildSidePanel(){
+  const panel=document.getElementById('side-panel');
+  // clear existing cards
+  while(panel.children.length>1) panel.removeChild(panel.lastChild);
+
+  PERSON_TYPES.forEach((type,ti)=>{
+    const card=document.createElement('div');
+    card.className='person-card';
+
+    const cv=document.createElement('canvas');
+    const cH=80, cW=70;
+    cv.width=cW; cv.height=cH;
+    const cctx=cv.getContext('2d');
+    cctx.save();
+    cctx.translate(cW/2, cH-8);
+    drawPersonShape(cctx, type, type.scale*0.85, '', false);
+    cctx.restore();
+
+    const nm=document.createElement('div'); nm.className='pname'; nm.textContent=type.label;
+    const ms=document.createElement('div'); ms.className='pmass'; ms.textContent=type.mass+' kg';
+
+    card.appendChild(cv); card.appendChild(nm); card.appendChild(ms);
+
+    // drag from panel
+    card.addEventListener('mousedown', e=>{
+      e.preventDefault();
+      startDragFromPanel(e.clientX, e.clientY, type);
+    });
+    card.addEventListener('touchstart', e=>{
+      e.preventDefault();
+      const t=e.touches[0];
+      startDragFromPanel(t.clientX, t.clientY, type);
+    },{passive:false});
+
+    panel.appendChild(card);
+  });
+}
+
+// PHYSICS
+const TOTAL_M=10,PX_M=55,BEAM_PX=TOTAL_M*PX_M,GG=10;
+let pivotRatio=0.5;
+// people on beam: {typeIdx, dist, side}  dist from pivot in meters
+let beamPeople=[];
+let beamAngle=0, angVel=0;
+let gameStarted=false;
+
+function groundY(){return H-80;}
+function pivotX(){return W/2+(pivotRatio-0.5)*BEAM_PX;}
+function pivotY(){return groundY()-90;}
+function leftM(){return pivotRatio*TOTAL_M;}
+function rightM(){return(1-pivotRatio)*TOTAL_M;}
+
+function updatePhysics(){
+  let tL=0,tR=0;
+  beamPeople.forEach(p=>{
+    const m=PERSON_TYPES[p.typeIdx].mass;
+    if(p.side==='left') tL+=p.dist*m*GG;
+    else tR+=p.dist*m*GG;
+  });
+  const net=tR-tL,maxA=28*Math.PI/180;
+  beamAngle+=(Math.tanh(net/3000)*maxA-beamAngle)*0.06;
+  beamAngle+=angVel;angVel*=0.92;
+  document.getElementById('t-left').textContent=tL.toFixed(0)+' Nm';
+  document.getElementById('t-right').textContent=tR.toFixed(0)+' Nm';
+  document.getElementById('status').textContent=Math.abs(tL-tR)<5?'Seimbang!':tL>tR?'Kiri Turun':'Kanan Turun';
+  const off=((pivotRatio-0.5)*TOTAL_M).toFixed(1);
+  const offN=parseFloat(off);
+  document.getElementById('pivot-pos').textContent=Math.abs(offN)<0.05?'Tengah':(offN>0?off+'m kanan':Math.abs(offN)+'m kiri');
+}
+
+// DRAG STATE
+let dragging=null;
+// dragging types:
+// {type:'panel', typeIdx, mx, my}   -- dragging from panel, ghost follows cursor
+// {type:'beam',  idx, mx, my}       -- dragging person already on beam
+// {type:'pivot', mx, my}
+
+let ghostPos=null; // {x,y, typeIdx} for panel drag ghost
+
+function startDragFromPanel(mx,my,type){
+  if(!gameStarted) return;
+  const ti=PERSON_TYPES.indexOf(type);
+  dragging={type:'panel', typeIdx:ti, mx, my};
+  ghostPos={x:mx, y:my, typeIdx:ti};
+}
+
+// world coords of a person on beam
+function personWorldPos(p){
+  const px=pivotX(), py=pivotY();
+  const cos=Math.cos(beamAngle), sin=Math.sin(beamAngle);
+  const bx= p.side==='left'? -p.dist*PX_M : p.dist*PX_M;
+  return { wx: px+bx*cos, wy: py+bx*sin-6 };
+}
+
+function hitPersonOnBeam(mx,my){
+  for(let i=0;i<beamPeople.length;i++){
+    const {wx,wy}=personWorldPos(beamPeople[i]);
+    const sc=PERSON_TYPES[beamPeople[i].typeIdx].scale;
+    const r=20+sc*20;
+    if(Math.hypot(mx-wx,my-wy)<r) return i;
+  }
+  return -1;
+}
+function hitPivot(mx,my){const px=pivotX(),py=pivotY();return Math.hypot(mx-px,my-(py+22))<30;}
+
+function overTrash(mx,my){
+  const el=document.getElementById('trash');
+  const r=el.getBoundingClientRect();
+  return mx>=r.left&&mx<=r.right&&my>=r.top&&my<=r.bottom;
+}
+
+function onDown(mx,my){
+  if(!gameStarted) return;
+  if(hitPivot(mx,my)){dragging={type:'pivot',mx,my};return;}
+  const hi=hitPersonOnBeam(mx,my);
+  if(hi>=0){dragging={type:'beam',idx:hi,mx,my};return;}
+}
+function onMove(mx,my){
+  if(!dragging) return;
+  if(dragging.type==='panel'){
+    ghostPos={x:mx,y:my,typeIdx:dragging.typeIdx};
+    return;
+  }
+  if(dragging.type==='pivot'){
+    const minX=W/2-BEAM_PX/2+PX_M, maxX=W/2+BEAM_PX/2-PX_M;
+    const cx=Math.max(minX,Math.min(maxX,mx));
+    pivotRatio=0.5+(cx-W/2)/BEAM_PX;
+    beamPeople.forEach(p=>{
+      const maxD=p.side==='left'?leftM()-0.2:rightM()-0.2;
+      if(p.dist>maxD) p.dist=Math.max(0.2,maxD);
+    });
+    return;
+  }
+  if(dragging.type==='beam'){
+    // move person along beam
+    const p=beamPeople[dragging.idx];
+    const relX=mx-pivotX();
+    // determine new side based on which side of pivot
+    if(relX<0){
+      p.side='left';
+      p.dist=Math.max(0.2,Math.min(leftM()-0.2,Math.abs(relX)/PX_M));
+    } else {
+      p.side='right';
+      p.dist=Math.max(0.2,Math.min(rightM()-0.2,Math.abs(relX)/PX_M));
+    }
+    // check trash
+    document.getElementById('trash').className=overTrash(mx,my)?'hover':'';
+  }
+}
+function onUp(mx,my){
+  if(!dragging){return;}
+  if(dragging.type==='panel'){
+    ghostPos=null;
+    // drop onto beam?
+    const px=pivotX(), py=pivotY();
+    // check if near beam area (vertically)
+    const beamTopY = py - 60; // approx top of beam (person foot level)
+    const beamBotY = py + 40;
+    if(my>beamTopY-80 && my<beamBotY+80){
+      // compute dist from pivot
+      const relX=mx-px;
+      const side=relX<0?'left':'right';
+      const dist=Math.max(0.2,Math.min(side==='left'?leftM()-0.2:rightM()-0.2, Math.abs(relX)/PX_M));
+      beamPeople.push({typeIdx:dragging.typeIdx, side, dist});
+    }
+    dragging=null;
+    return;
+  }
+  if(dragging.type==='beam'){
+    document.getElementById('trash').className='';
+    if(overTrash(mx,my)){
+      beamPeople.splice(dragging.idx,1);
+    }
+  }
+  dragging=null;
+  document.getElementById('trash').className='';
+}
+
+// Draw person on main canvas (kaki di y=0)
+function drawPersonMain(type, sc, label){
+  drawPersonShape(ctx, type, sc, label, true);
+}
+
+// MAIN DRAW
+function draw(){
+  // sky
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#4fb8f0');sky.addColorStop(.55,'#a2d8f5');sky.addColorStop(1,'#c5e8b0');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  // matahari
+  const sx=W-110,sy=72,sg=ctx.createRadialGradient(sx,sy,10,sx,sy,65);
+  sg.addColorStop(0,'rgba(255,240,80,.85)');sg.addColorStop(1,'rgba(255,200,40,0)');
+  ctx.fillStyle=sg;ctx.beginPath();ctx.arc(sx,sy,65,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FFE44D';ctx.beginPath();ctx.arc(sx,sy,27,0,Math.PI*2);ctx.fill();
+  // awan
+  clouds.forEach(c=>{c.x+=c.s;if(c.x>W+130)c.x=-130;drawCloud(c.x,c.y,c.w);});
+  // tanah
+  const gg=ctx.createLinearGradient(0,H-85,0,H);
+  gg.addColorStop(0,'#4caf50');gg.addColorStop(.3,'#388e3c');gg.addColorStop(1,'#2e7d32');
+  ctx.fillStyle=gg;ctx.fillRect(0,H-80,W,80);
+  ctx.fillStyle='#43a047';
+  for(let bx=0;bx<W;bx+=38){ctx.beginPath();ctx.arc(bx,H-80,19,Math.PI,0);ctx.fill();}
+  // tanaman
+  plants.forEach(p=>{if(gameStarted&&p.grown<1)p.grown+=.009;drawPlant(p);});
+
+  updatePhysics();
+  const px=pivotX(), py=pivotY();
+  const leftPX=pivotRatio*BEAM_PX, rightPX=(1-pivotRatio)*BEAM_PX;
+
+  // BEAM
+  ctx.save();
+  ctx.translate(px,py);
+  ctx.rotate(beamAngle);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  ctx.beginPath();ctx.roundRect(-leftPX-3,7,leftPX+rightPX+6,13,5);ctx.fill();
+  // beam body
+  const bg=ctx.createLinearGradient(0,-6,0,12);
+  bg.addColorStop(0,'#e8a04a');bg.addColorStop(.45,'#d2691e');bg.addColorStop(1,'#a0522d');
+  ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect(-leftPX,-6,leftPX+rightPX,15,6);ctx.fill();
+  // serat
+  ctx.strokeStyle='rgba(0,0,0,.09)';ctx.lineWidth=1;
+  for(let lx=-leftPX+20;lx<rightPX;lx+=25){ctx.beginPath();ctx.moveTo(lx,-6);ctx.lineTo(lx,9);ctx.stroke();}
+  // meter marks
+  ctx.font='bold 9px Segoe UI';ctx.textAlign='center';
+  for(let m=1;m<=Math.ceil(leftM());m++){
+    const mx=-m*PX_M;if(mx<-leftPX+4)break;
+    ctx.fillStyle='rgba(255,255,255,0.9)';ctx.fillRect(mx-.5,-6,1,15);
+    ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillText(m+'m',mx,-9);
+  }
+  for(let m=1;m<=Math.ceil(rightM());m++){
+    const mx=m*PX_M;if(mx>rightPX-4)break;
+    ctx.fillStyle='rgba(255,255,255,0.9)';ctx.fillRect(mx-.5,-6,1,15);
+    ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillText(m+'m',mx,-9);
+  }
+  // ujung
+  ctx.fillStyle='#8B4513';
+  ctx.beginPath();ctx.roundRect(-leftPX-5,-7,10,17,4);ctx.fill();
+  ctx.beginPath();ctx.roundRect(rightPX-5,-7,10,17,4);ctx.fill();
+
+  // ORANG DI BEAM
+  beamPeople.forEach((p,i)=>{
+    if(dragging&&dragging.type==='beam'&&dragging.idx===i) return; // skip saat drag
+    const bx = p.side==='left'? -p.dist*PX_M : p.dist*PX_M;
+    const type=PERSON_TYPES[p.typeIdx];
+    ctx.save();
+    ctx.translate(bx,-6);
+    ctx.rotate(-beamAngle);
+    drawPersonMain(type, type.scale, p.dist.toFixed(1)+'m');
+    ctx.restore();
+  });
+
+  ctx.restore(); // end beam
+
+  // PIVOT
+  ctx.save();
+  const tg=ctx.createLinearGradient(px-5,0,px+5,0);
+  tg.addColorStop(0,'#555');tg.addColorStop(.5,'#bbb');tg.addColorStop(1,'#555');
+  ctx.fillStyle=tg;ctx.beginPath();ctx.roundRect(px-4,py+6,8,groundY()-py-6,3);ctx.fill();
+  ctx.fillStyle='#e74c3c';ctx.strokeStyle='#c0392b';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(px,py+2);ctx.lineTo(px-20,py+40);ctx.lineTo(px+20,py+40);ctx.closePath();
+  ctx.fill();ctx.stroke();
+  ctx.fillStyle='#FFE44D';ctx.strokeStyle='#f39c12';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.arc(px,py,8,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#c0392b';ctx.beginPath();ctx.roundRect(px-24,py+38,48,10,4);ctx.fill();
+  ctx.restore();
+
+  // GHOST (dragging from panel or beam)
+  if(dragging&&dragging.type==='panel'&&ghostPos){
+    const type=PERSON_TYPES[ghostPos.typeIdx];
+    ctx.save();
+    ctx.globalAlpha=0.7;
+    ctx.translate(ghostPos.x, ghostPos.y);
+    drawPersonMain(type, type.scale, '');
+    ctx.globalAlpha=1;
+    ctx.restore();
+  }
+  if(dragging&&dragging.type==='beam'){
+    // draw person at cursor
+    const p=beamPeople[dragging.idx];
+    const type=PERSON_TYPES[p.typeIdx];
+    const {wx,wy}=personWorldPos(p);
+    ctx.save();
+    ctx.globalAlpha=0.75;
+    ctx.translate(wx,wy);
+    drawPersonMain(type, type.scale, p.dist.toFixed(1)+'m');
+    ctx.globalAlpha=1;
+    ctx.restore();
+  }
+
+  requestAnimationFrame(draw);
+}
+
+// EVENTS
+function getXY(e){ return e.touches? [e.touches[0].clientX,e.touches[0].clientY]:[e.clientX,e.clientY]; }
+
+document.addEventListener('mousedown',e=>{
+  const[mx,my]=[e.clientX,e.clientY];
+  // don't fire if clicking panel
+  if(document.getElementById('side-panel').contains(e.target)) return;
+  onDown(mx,my);
+});
+document.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));
+document.addEventListener('mouseup',e=>onUp(e.clientX,e.clientY));
+
+document.addEventListener('touchstart',e=>{
+  if(document.getElementById('side-panel').contains(e.target)) return;
+  const t=e.touches[0];
+  e.preventDefault();
+  onDown(t.clientX,t.clientY);
+},{passive:false});
+document.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  onMove(t.clientX,t.clientY);
+  if(dragging&&dragging.type==='panel') ghostPos={x:t.clientX,y:t.clientY,typeIdx:dragging.typeIdx};
+},{passive:false});
+document.addEventListener('touchend',e=>{
+  const t=e.changedTouches[0];
+  onUp(t.clientX,t.clientY);
+},{passive:false});
+
+function resetAll(){
+  pivotRatio=0.5; beamPeople=[];
+  beamAngle=0; angVel=0; dragging=null; ghostPos=null;
+  initPlants(); plants.forEach(p=>p.grown=0);
+  document.getElementById('trash').className='';
+}
+function startGame(){
+  document.getElementById('start-screen').style.display='none';
+  gameStarted=true; createMusic(); initPlants();
+}
+
+buildSidePanel();
+initPlants();
+draw();
+</script>
+</body>
+</html>
